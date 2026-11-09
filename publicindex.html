@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Satisfactory Stempeluhr</title>
+<style>
+  :root {
+    --orange:#fa9549; --orange-dark:#c8641a; --bg:#000; --panel:#0d0d0f; --panel2:#17181b;
+    --line:#2a2c31; --text:#e8e8e8; --muted:#8b9099; --red:#e5231b; --green:#3ddc84; --blue:#4aa3ff;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text);
+    background-image: linear-gradient(rgba(250,149,73,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(250,149,73,.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  header {
+    background:repeating-linear-gradient(-45deg,#111 0 14px,#1a1a1a 14px 28px);
+    border-bottom:4px solid var(--orange); padding:14px 24px; display:flex; align-items:center; gap:14px;
+  }
+  header h1 { margin:0; font-size:1.3rem; letter-spacing:.15em; text-transform:uppercase; color:var(--orange); }
+  header .tag { margin-left:auto; font-size:.75rem; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; }
+  main { max-width:1000px; margin:0 auto; padding:16px; display:grid; gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--orange); padding:16px; overflow-x:auto; }
+  h2 { margin:0 0 12px; font-size:.95rem; letter-spacing:.14em; text-transform:uppercase; color:var(--orange); }
+  select,input { font:inherit; padding:8px 12px; border:1px solid var(--line); background:var(--panel2); color:var(--text); border-radius:2px; }
+  select:focus,input:focus { outline:1px solid var(--orange); }
+  button.small, button.add { font:inherit; font-size:.8rem; padding:6px 10px; background:var(--panel2); color:var(--text); border:1px solid var(--line); cursor:pointer; text-transform:uppercase; letter-spacing:.08em; }
+  button.small:hover, button.add:hover { border-color:var(--orange); color:var(--orange); }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  table { width:100%; border-collapse:collapse; }
+  th,td { text-align:left; padding:8px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { color:var(--muted); font-weight:500; font-size:.75rem; letter-spacing:.1em; text-transform:uppercase; }
+  .bar { background:#1f2024; height:12px; min-width:90px; border:1px solid var(--line); }
+  .bar > div { height:100%; background:var(--green); }
+  .bar > div.ot { background:var(--orange); }
+  .ot-text { color:var(--orange); font-weight:700; }
+  .live { color:var(--green); }
+  .pause { color:var(--blue); }
+  .muted { color:var(--muted); }
+  #error { color:var(--red); min-height:1.2em; margin-top:8px; }
+
+  /* ---------- Schaltpult ---------- */
+  .console { display:flex; gap:40px; align-items:center; justify-content:center; flex-wrap:wrap; padding:24px 8px; }
+  .who { display:flex; flex-direction:column; gap:10px; min-width:200px; }
+  .who label { font-size:.75rem; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; }
+  #status { font-size:.95rem; min-height:2.6em; }
+
+  /* Der grosse rote Knopf mit Glasabdeckung */
+  .bigbtn { position:relative; width:230px; height:230px; }
+  .base {
+    position:absolute; inset:0; border-radius:50%;
+    background:radial-gradient(circle at 50% 40%, #3a3c42, #1a1b1e 70%);
+    border:6px solid #2d2f34; box-shadow:0 0 0 3px #000, inset 0 4px 12px rgba(0,0,0,.8), 0 10px 30px rgba(0,0,0,.8);
+  }
+  .base::before { /* Warnstreifen-Ring */
+    content:''; position:absolute; inset:8px; border-radius:50%;
+    background:repeating-conic-gradient(var(--orange) 0 10deg, #111 10deg 20deg); opacity:.85;
+    -webkit-mask:radial-gradient(circle, transparent 62%, #000 63%); mask:radial-gradient(circle, transparent 62%, #000 63%);
+  }
+  .redbtn {
+    position:absolute; left:50%; top:50%; width:150px; height:150px; margin:-75px 0 0 -75px; border-radius:50%;
+    border:none; cursor:pointer; color:#fff; font:700 1rem/1.2 inherit; letter-spacing:.1em; text-transform:uppercase;
+    background:radial-gradient(circle at 35% 30%, #ff6a5e, var(--red) 45%, #7d0d08 100%);
+    box-shadow:0 10px 0 #5a0a06, 0 14px 22px rgba(0,0,0,.9), inset 0 -6px 10px rgba(0,0,0,.35), inset 0 6px 10px rgba(255,255,255,.25);
+    transition:transform .08s, box-shadow .08s; text-shadow:0 2px 3px rgba(0,0,0,.6);
+  }
+  .redbtn:active:not(:disabled) { transform:translateY(8px); box-shadow:0 2px 0 #5a0a06, 0 4px 10px rgba(0,0,0,.9), inset 0 -6px 10px rgba(0,0,0,.35); }
+  .redbtn:disabled { filter:grayscale(.9) brightness(.45); cursor:not-allowed; }
+  .redbtn.out { background:radial-gradient(circle at 35% 30%, #ffb457, #d97a10 45%, #7a4208 100%); box-shadow:0 10px 0 #4d2a05, 0 14px 22px rgba(0,0,0,.9), inset 0 -6px 10px rgba(0,0,0,.35), inset 0 6px 10px rgba(255,255,255,.25); }
+  .redbtn.out:active:not(:disabled) { box-shadow:0 2px 0 #4d2a05, 0 4px 10px rgba(0,0,0,.9); }
+
+  /* Glasklappe */
+  .glass {
+    position:absolute; left:50%; top:50%; width:190px; height:190px; margin:-95px 0 0 -95px; border-radius:50%;
+    background:linear-gradient(145deg, rgba(190,230,255,.28), rgba(120,180,220,.10) 55%, rgba(255,255,255,.22));
+    border:3px solid rgba(200,235,255,.55); box-shadow:0 6px 18px rgba(0,0,0,.7), inset 0 0 20px rgba(255,255,255,.18);
+    backdrop-filter:blur(1.5px); cursor:pointer; transform-origin:50% 100%;
+    transition:transform .45s cubic-bezier(.3,1.4,.5,1); z-index:2;
+  }
+  .glass::after { content:''; position:absolute; top:14%; left:18%; width:34%; height:12%; border-radius:50%; background:rgba(255,255,255,.35); transform:rotate(-30deg); }
+  .glass .hint { position:absolute; bottom:10px; width:100%; text-align:center; font-size:.65rem; letter-spacing:.12em; text-transform:uppercase; color:rgba(220,240,255,.8); }
+  .bigbtn.open .glass { transform:perspective(500px) rotateX(-115deg); pointer-events:none; }
+  .bigbtn.open .glass .hint { display:none; }
+  .bigbtn.locked .glass { pointer-events:none; }
+
+  /* Kippschalter fuer die Pause */
+  .switchbox { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .switchbox .lbl { font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+  .plate {
+    width:70px; height:130px; background:linear-gradient(#2b2d33,#1a1b1f); border:2px solid #3a3d44; border-radius:6px;
+    box-shadow:inset 0 2px 6px rgba(0,0,0,.8), 0 4px 10px rgba(0,0,0,.7); position:relative; cursor:pointer;
+  }
+  .plate.disabled { opacity:.4; cursor:not-allowed; }
+  .plate .slot { position:absolute; left:50%; top:14px; bottom:14px; width:22px; margin-left:-11px; background:#050505; border-radius:11px; box-shadow:inset 0 2px 6px #000; }
+  .plate .lever {
+    position:absolute; left:50%; width:30px; height:54px; margin-left:-15px; border-radius:8px;
+    background:linear-gradient(90deg,#8a8d95,#d6d8de 45%,#8a8d95); box-shadow:0 4px 8px rgba(0,0,0,.8);
+    top:14px; transition:top .18s;
+  }
+  .plate.on .lever { top:62px; background:linear-gradient(90deg,#2a6fb8,#6db4ff 45%,#2a6fb8); }
+  .led { width:12px; height:12px; border-radius:50%; background:#222; box-shadow:inset 0 1px 2px #000; }
+  .led.on { background:var(--blue); box-shadow:0 0 10px var(--blue); }
+
+  .newuser { margin-top:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Satisfactory Stempeluhr</h1>
+  <span class="tag">Pionier-Arbeitszeiterfassung</span>
+</header>
+<main>
+
+  <div class="card">
+    <h2>Schaltpult</h2>
+    <div class="console">
+      <div class="who">
+        <label for="userSelect">Pionier</label>
+        <select id="userSelect"></select>
+        <div id="status" class="muted"></div>
+      </div>
+
+      <div class="bigbtn" id="bigbtn">
+        <div class="base"></div>
+        <button class="redbtn" id="mainBtn">Einstempeln</button>
+        <div class="glass" id="glass"><span class="hint">Klappe öffnen</span></div>
+      </div>
+
+      <div class="switchbox">
+        <span class="lbl">Pause</span>
+        <div class="plate" id="brkSwitch"><div class="slot"></div><div class="lever"></div></div>
+        <div class="led" id="brkLed"></div>
+      </div>
+    </div>
+    <div class="row newuser">
+      <input id="newName" placeholder="Neuer Pionier">
+      <button class="add" id="addUser">Hinzufügen</button>
+    </div>
+    <div id="error"></div>
+  </div>
+
+  <div class="card">
+    <h2>Wochenübersicht <span id="weekLabel" class="muted"></span></h2>
+    <div class="row" style="margin-bottom:8px">
+      <button class="small" id="prevWeek">← Woche</button>
+      <button class="small" id="nextWeek">Woche →</button>
+    </div>
+    <table>
+      <thead><tr><th>Name</th><th>Arbeitszeit</th><th>Pause (max. 0:30 h)</th><th>Soll 15 h</th><th>Überstunden</th><th>Gesamt Überstunden</th></tr></thead>
+      <tbody id="summary"></tbody>
+    </table>
+    <p class="muted" style="font-size:.85rem">Pro Woche werden maximal 30 Minuten Pause anerkannt. Pausenzeit darüber hinaus zählt als Arbeitszeit.</p>
+  </div>
+
+  <div class="card">
+    <h2>Einträge dieser Woche</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Start</th><th>Ende</th><th>Pause</th><th>Brutto</th><th></th></tr></thead>
+      <tbody id="entries"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Nachtragen</h2>
+    <div class="row">
+      <select id="manUser"></select>
+      <input type="datetime-local" id="manStart">
+      <input type="datetime-local" id="manEnd">
+      <button class="add" id="manAdd">Eintrag speichern</button>
+    </div>
+  </div>
+</main>
+
+<script>
+const TARGET_HOURS = 15;
+const MAX_BREAK_MIN = 30;
+const HOUR = 3600000;
+const WEEK = 7 * 24 * HOUR;
+let db = { users: [], entries: [] };
+let weekOffset = 0;
+let password = localStorage.getItem('teamPassword') || '';
+
+async function api(path, method = 'GET', body) {
+  const res = await fetch('/api' + path, {
+    method,
+    headers: { 'Content-Type': 'application/json', 'x-team-password': password },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (res.status === 401) {
+    password = prompt('Team-Passwort:') || '';
+    localStorage.setItem('teamPassword', password);
+    return api(path, method, body);
+  }
+  const data = await res.json();
+  if (!res.ok) { document.getElementById('error').textContent = data.error || 'Fehler'; throw new Error(data.error); }
+  document.getElementById('error').textContent = '';
+  return data;
+}
+
+function weekStart(offset = 0) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const day = (d.getDay() + 6) % 7; // Montag = 0
+  d.setDate(d.getDate() - day + offset * 7);
+  return d.getTime();
+}
+
+function ov(s, e, from, to) {
+  return Math.max(0, Math.min(e || Date.now(), to) - Math.max(s, from));
+}
+
+function weekRaw(user, from, to) {
+  let gross = 0, brk = 0;
+  db.entries.filter(e => e.user === user).forEach(e => {
+    gross += ov(e.start, e.end, from, to);
+    (e.breaks || []).forEach(b => { brk += ov(b.start, b.end, from, to); });
+  });
+  return { gross, brk };
+}
+
+function weekNet(user, from) {
+  const { gross, brk } = weekRaw(user, from, from + WEEK);
+  const credited = Math.min(brk, MAX_BREAK_MIN * 60000);
+  return { work: gross - credited, brk, credited };
+}
+
+function fmtH(ms) {
+  const m = Math.round(ms / 60000);
+  return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') + ' h';
+}
+function fmtDate(t) { return new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }); }
+
+let glassOpen = false;
+let glassTimer = null;
+
+function closeGlass() {
+  glassOpen = false;
+  clearTimeout(glassTimer);
+  document.getElementById('bigbtn').classList.remove('open');
+}
+function openGlass() {
+  glassOpen = true;
+  document.getElementById('bigbtn').classList.add('open');
+  clearTimeout(glassTimer);
+  glassTimer = setTimeout(closeGlass, 6000); // klappt nach 6 s von selbst wieder zu
+}
+
+function render() {
+  const from = weekStart(weekOffset);
+  const to = from + WEEK;
+  document.getElementById('weekLabel').textContent =
+    '(' + new Date(from).toLocaleDateString('de-DE') + ' – ' + new Date(to - 1).toLocaleDateString('de-DE') + ')';
+
+  ['userSelect', 'manUser'].forEach(id => {
+    const el = document.getElementById(id);
+    const cur = el.value;
+    el.innerHTML = db.users.map(u => `<option>${u}</option>`).join('');
+    if (db.users.includes(cur)) el.value = cur;
+  });
+
+  const user = document.getElementById('userSelect').value;
+  const open = db.entries.find(e => e.user === user && !e.end);
+  const onBreak = !!(open && (open.breaks || []).some(b => !b.end));
+
+  let status = 'Nicht eingestempelt';
+  if (open) {
+    status = onBreak
+      ? '<span class="pause">⏸ In Pause</span><br><span class="muted">eingestempelt seit ' + fmtDate(open.start) + '</span>'
+      : '<span class="live">● Im Dienst</span><br><span class="muted">seit ' + fmtDate(open.start) + '</span>';
+  }
+  document.getElementById('status').innerHTML = status;
+
+  // Grosser Knopf: je nach Zustand Einstempeln (rot) oder Ausstempeln (orange)
+  const main = document.getElementById('mainBtn');
+  main.textContent = open ? 'Ausstempeln' : 'Einstempeln';
+  main.classList.toggle('out', !!open);
+  main.disabled = !db.users.length || !glassOpen;
+  document.getElementById('bigbtn').classList.toggle('locked', !db.users.length);
+
+  // Kippschalter
+  const sw = document.getElementById('brkSwitch');
+  sw.classList.toggle('on', onBreak);
+  sw.classList.toggle('disabled', !open);
+  document.getElementById('brkLed').classList.toggle('on', onBreak);
+
+  // Wochenuebersicht
+  const rows = db.users.map(u => {
+    const w = weekNet(u, from);
+    const ot = Math.max(0, w.work - TARGET_HOURS * HOUR);
+    const mine = db.entries.filter(e => e.user === u);
+    let total = 0;
+    if (mine.length) {
+      const first = Math.min(...mine.map(e => e.start));
+      for (let ws = weekStart(0); ws + WEEK > first; ws -= WEEK) {
+        total += weekNet(u, ws).work - TARGET_HOURS * HOUR;
+      }
+    }
+    const pct = Math.min(100, w.work / (TARGET_HOURS * HOUR) * 100);
+    const active = db.entries.some(e => e.user === u && !e.end);
+    const paused = db.entries.some(e => e.user === u && !e.end && (e.breaks || []).some(b => !b.end));
+    const marker = paused ? '<span class="pause">⏸</span>' : (active ? '<span class="live">●</span>' : '');
+    const brkText = fmtH(w.credited) + (w.brk > w.credited ? ' <span class="muted">(+' + fmtH(w.brk - w.credited) + ' nicht anerkannt)</span>' : '');
+    return `<tr>
+      <td>${u} ${marker}</td>
+      <td>${fmtH(w.work)}</td>
+      <td>${brkText}</td>
+      <td><div class="bar"><div class="${ot ? 'ot' : ''}" style="width:${pct}%"></div></div></td>
+      <td class="${ot ? 'ot-text' : ''}">${ot ? '+' + fmtH(ot) : '–'}</td>
+      <td>${(total < 0 ? '-' : '+') + fmtH(Math.abs(total))}</td>
+    </tr>`;
+  });
+  document.getElementById('summary').innerHTML = rows.join('') || '<tr><td colspan="6" class="muted">Noch keine Pioniere</td></tr>';
+
+  const list = db.entries.filter(e => ov(e.start, e.end, from, to) > 0).sort((a, b) => b.start - a.start);
+  document.getElementById('entries').innerHTML = list.map(e => {
+    const brk = (e.breaks || []).reduce((s, b) => s + ((b.end || Date.now()) - b.start), 0);
+    return `<tr>
+      <td>${e.user}</td><td>${fmtDate(e.start)}</td>
+      <td>${e.end ? fmtDate(e.end) : '<span class="live">läuft</span>'}</td>
+      <td>${brk ? fmtH(brk) : '–'}</td>
+      <td>${fmtH((e.end || Date.now()) - e.start)}</td>
+      <td><button class="small" onclick="del('${e.id}')">Löschen</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="muted">Keine Einträge</td></tr>';
+}
+
+async function refresh() { db = await api('/data'); render(); }
+async function act(path, body) { db = await api(path, 'POST', body); render(); }
+async function del(id) { if (confirm('Eintrag wirklich löschen?')) { db = await api('/entries/' + id, 'DELETE'); render(); } }
+const sel = () => document.getElementById('userSelect').value;
+const myOpen = () => db.entries.find(e => e.user === sel() && !e.end);
+
+// Glasklappe oeffnen
+document.getElementById('glass').onclick = () => { if (db.users.length) { openGlass(); render(); } };
+
+// Grosser Knopf: stempelt ein oder aus, danach klappt die Abdeckung wieder zu
+document.getElementById('mainBtn').onclick = async () => {
+  if (!glassOpen) return;
+  const path = myOpen() ? '/clockout' : '/clockin';
+  closeGlass();
+  try { await act(path, { user: sel() }); } catch (e) { render(); }
+};
+
+// Kippschalter fuer die Pause
+document.getElementById('brkSwitch').onclick = async () => {
+  const open = myOpen();
+  if (!open) return;
+  const onBreak = (open.breaks || []).some(b => !b.end);
+  try { await act(onBreak ? '/breakend' : '/breakstart', { user: sel() }); } catch (e) { render(); }
+};
+
+document.getElementById('userSelect').onchange = () => { closeGlass(); render(); };
+document.getElementById('addUser').onclick = async () => {
+  const el = document.getElementById('newName');
+  if (el.value.trim()) { await act('/users', { name: el.value }); el.value = ''; }
+};
+document.getElementById('prevWeek').onclick = () => { weekOffset--; render(); };
+document.getElementById('nextWeek').onclick = () => { if (weekOffset < 0) weekOffset++; render(); };
+document.getElementById('manAdd').onclick = () => {
+  const s = new Date(document.getElementById('manStart').value).getTime();
+  const e = new Date(document.getElementById('manEnd').value).getTime();
+  act('/entries', { user: document.getElementById('manUser').value, start: s, end: e });
+};
+
+refresh();
+setInterval(() => { if (!glassOpen) refresh(); }, 30000);
+</script>
+</body>
+</html>
